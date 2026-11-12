@@ -5300,6 +5300,24 @@ msgstr ""
 "窗口以 1080p 渲染）；低于 100% 时主机以高于窗口的分辨率渲染以获得更清晰的画"
 "面。修改后对新连接生效。"
 
+#: plugins/rdp/rdp_settings.c
+msgid "Ignore local display scaling (native pixels)"
+msgstr "忽略本地显示缩放（按物理像素显示）"
+
+#: plugins/rdp/rdp_settings.c
+msgid ""
+"Render the remote desktop at the physical pixel size of the client window "
+"and display it unscaled, so that the local desktop scale factor (including "
+"fractional Wayland scales, e.g. 150% in KDE) does not magnify the remote "
+"picture. The remote host then has to render more pixels; adjust the desktop "
+"and device scale factors to keep the remote UI readable. Multi monitor "
+"sessions are not affected. Takes effect on new connections."
+msgstr ""
+"以客户机窗口的物理像素尺寸渲染远程桌面并按原尺寸显示，使本地桌面缩放因子（包"
+"括 Wayland 小数缩放，如 KDE 的 150%）不再放大远程画面。远程主机因此需要渲染更"
+"多像素；可调整桌面和设备缩放因子以保持远程界面可读。多显示器会话不受影响。修"
+"改后对新连接生效。"
+
 #~ msgid "Enter TOTP/OTP/2FA code"
 #~ msgstr "输入 TOTP/OTP/2FA 代码"
 

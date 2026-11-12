@@ -424,6 +424,7 @@ if(NOT APPLE)
   pkg_check_modules(wayland-client wayland-client)
 endif()
 if(wayland-client_FOUND)
+  add_definitions(-DHAVE_WAYLAND_CLIENT)
   set(GTK_LIBRARIES
       ${GTK3_LIBRARY}
       ${GDK3_LIBRARY}

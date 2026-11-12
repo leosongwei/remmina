@@ -258,12 +258,14 @@ static gboolean remmina_rdp_event_dynres_is_scaled(rfContext *rfi)
 }
 
 /* TRUE when the drawing must be scaled to the drawing area size, either in
- * classic SCALED mode, or in DYNRES mode with a non 100% scale factor */
+ * classic SCALED mode, in DYNRES mode with a non 100% scale factor, or when
+ * the remote desktop is rendered at the physical pixel size of the window */
 static gboolean remmina_rdp_event_is_scaled_like(rfContext *rfi)
 {
 	TRACE_CALL(__func__);
 	return rfi->scale == REMMINA_PROTOCOL_WIDGET_SCALE_MODE_SCALED ||
-	       remmina_rdp_event_dynres_is_scaled(rfi);
+	       remmina_rdp_event_dynres_is_scaled(rfi) ||
+	       rfi->local_scale > 1.0;
 }
 
 static void remmina_rdp_event_scale_area(RemminaProtocolWidget *gp, gint *x, gint *y, gint *w, gint *h)
@@ -531,12 +533,13 @@ static gboolean remmina_rdp_event_delayed_monitor_layout(RemminaProtocolWidget *
 		gint num_monitors = freerdp_settings_get_uint32(rfi->clientContext.context.settings, FreeRDP_MonitorCount);
 
 		/* In single monitor mode, ask the server to render the remote desktop at
-		 * the window size scaled by the dynamic resolution update scale factor */
+		 * the window size scaled by the dynamic resolution update scale factor
+		 * and by the local display scale factor */
 		gint reqwidth = gpwidth, reqheight = gpheight;
 		if (!remmina_plugin_service->file_get_int(remminafile, "multimon", FALSE)) {
 			gint pct = remmina_rdp_event_dynres_scale_pct(rfi);
-			reqwidth = gpwidth * 100 / pct;
-			reqheight = gpheight * 100 / pct;
+			reqwidth = (gint)(gpwidth * rfi->local_scale * 100.0 / pct);
+			reqheight = (gint)(gpheight * rfi->local_scale * 100.0 / pct);
 		}
 
 		if ((reqwidth != prevwidth || reqheight != prevheight || num_monitors != rfi->prev_num_monitors) && reqwidth >= 200 && reqheight >= 200) {
@@ -1416,8 +1419,11 @@ void remmina_rdp_event_update_scale(RemminaProtocolWidget *gp)
 
 	remmina_rdp_event_update_scale_factor(gp);
 
-	if (rfi->scale == REMMINA_PROTOCOL_WIDGET_SCALE_MODE_SCALED || rfi->scale == REMMINA_PROTOCOL_WIDGET_SCALE_MODE_DYNRES)
-		/* In scaled mode and autores mode, drawing_area will get its dimensions from its parent */
+	if (rfi->scale == REMMINA_PROTOCOL_WIDGET_SCALE_MODE_SCALED ||
+	    rfi->scale == REMMINA_PROTOCOL_WIDGET_SCALE_MODE_DYNRES ||
+	    rfi->local_scale > 1.0)
+		/* In scaled mode, autores mode and when compensating the local
+		 * display scale, drawing_area will get its dimensions from its parent */
 		gtk_widget_set_size_request(rfi->drawing_area, -1, -1);
 	else
 		/* In non scaled mode, the plugins forces dimensions of drawing area */

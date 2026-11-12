@@ -343,6 +343,14 @@ struct rf_context {
 	/* Dynamic resolution update scale factor, %, cached from the
 	 * Remmina preferences when the connection is established */
 	gint			dynres_scale_pct;
+	/* Scale factor the local display server applies to the connection window,
+	 * cached when the connection is established. 1.0 means the remote picture
+	 * is drawn at the window size, without local scaling compensation */
+	gdouble			local_scale;
+	/* Initial remote desktop size in physical pixels, 0 when the size chosen
+	 * by the user profile must be used as is */
+	gint			initial_width;
+	gint			initial_height;
 	guint			delayed_monitor_layout_handler;
 	gboolean		use_client_keymap;
 

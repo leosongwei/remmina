@@ -131,6 +131,8 @@ typedef struct _RemminaPluginRdpsetGrid {
 	GtkWidget *	desktop_scale_factor_spin;
 	/* Scale factor for the dynamic resolution update feature */
 	GtkWidget *	dynres_scale_spin;
+	/* Compensation of the local display scale factor */
+	GtkWidget *	ignore_local_scale_check;
 	/* FreeRDP /scale-device: Scaling of appstore app */
 	GtkListStore *	device_scale_factor_store;
 	GtkWidget *	device_scale_factor_combo;
@@ -225,6 +227,11 @@ static void remmina_rdp_settings_grid_destroy(GtkWidget *widget, gpointer data)
 	val = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(grid->dynres_scale_spin));
 	s = g_strdup_printf("%d", val);
 	remmina_plugin_service->pref_set_value("rdp_dynres_scale", s);
+	g_free(s);
+
+	val = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(grid->ignore_local_scale_check)) ? 1 : 0;
+	s = g_strdup_printf("%d", val);
+	remmina_plugin_service->pref_set_value("rdp_ignore_local_scale", s);
 	g_free(s);
 
 	if (gtk_combo_box_get_active_iter(GTK_COMBO_BOX(grid->desktop_orientation_combo), &iter))
@@ -694,18 +701,28 @@ static void remmina_rdp_settings_grid_init(RemminaPluginRdpsetGrid *grid)
 	g_free(s);
 	grid->dynres_scale_spin = widget;
 
+	widget = gtk_check_button_new_with_label(_("Ignore local display scaling (native pixels)"));
+	gtk_widget_show(widget);
+	gtk_widget_set_margin_start(GTK_WIDGET(widget), 6);
+	gtk_grid_attach(GTK_GRID(grid), widget, 1, 12, 2, 1);
+	gtk_widget_set_tooltip_text(widget, _("Render the remote desktop at the physical pixel size of the client window and display it unscaled, so that the local desktop scale factor (including fractional Wayland scales, e.g. 150% in KDE) does not magnify the remote picture. The remote host then has to render more pixels; adjust the desktop and device scale factors to keep the remote UI readable. Multi monitor sessions are not affected. Takes effect on new connections."));
+	s = remmina_plugin_service->pref_get_value("rdp_ignore_local_scale");
+	gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget), s && s[0] == '1' ? TRUE : FALSE);
+	g_free(s);
+	grid->ignore_local_scale_check = widget;
+
 	widget = gtk_label_new(_("Desktop orientation"));
 	gtk_widget_show(widget);
 	gtk_widget_set_halign(GTK_WIDGET(widget), GTK_ALIGN_START);
 	gtk_widget_set_valign(GTK_WIDGET(widget), GTK_ALIGN_CENTER);
 	gtk_widget_set_margin_end(GTK_WIDGET(widget), 6);
 	gtk_widget_set_margin_start(GTK_WIDGET(widget), 18);
-	gtk_grid_attach(GTK_GRID(grid), widget, 0, 12, 1, 1);
+	gtk_grid_attach(GTK_GRID(grid), widget, 0, 13, 1, 1);
 
 	widget = gtk_combo_box_new_with_model(GTK_TREE_MODEL(grid->desktop_orientation_store));
 	gtk_widget_show(widget);
 	gtk_widget_set_margin_start(GTK_WIDGET(widget), 6);
-	gtk_grid_attach(GTK_GRID(grid), widget, 1, 12, 2, 1);
+	gtk_grid_attach(GTK_GRID(grid), widget, 1, 13, 2, 1);
 
 	renderer = gtk_cell_renderer_text_new();
 	gtk_cell_layout_pack_start(GTK_CELL_LAYOUT(widget), renderer, TRUE);
@@ -720,12 +737,12 @@ static void remmina_rdp_settings_grid_init(RemminaPluginRdpsetGrid *grid)
 	gtk_widget_set_valign(GTK_WIDGET(widget), GTK_ALIGN_CENTER);
 	gtk_widget_set_margin_end(GTK_WIDGET(widget), 6);
 	gtk_widget_set_margin_start(GTK_WIDGET(widget), 18);
-	gtk_grid_attach(GTK_GRID(grid), widget, 0, 13, 1, 1);
+	gtk_grid_attach(GTK_GRID(grid), widget, 0, 14, 1, 1);
 
 	widget = gtk_check_button_new_with_label(_("Disable smooth scrolling"));
 	gtk_widget_show(widget);
 	gtk_widget_set_margin_start(GTK_WIDGET(widget), 6);
-	gtk_grid_attach(GTK_GRID(grid), widget, 1, 13, 2, 1);
+	gtk_grid_attach(GTK_GRID(grid), widget, 1, 14, 2, 1);
 	grid->disable_smooth_scrolling_check = widget;
 
 	s = remmina_plugin_service->pref_get_value("rdp_disable_smooth_scrolling");
@@ -739,18 +756,18 @@ static void remmina_rdp_settings_grid_init(RemminaPluginRdpsetGrid *grid)
 	gtk_widget_set_valign(GTK_WIDGET(widget), GTK_ALIGN_CENTER);
 	gtk_widget_set_margin_end(GTK_WIDGET(widget), 6);
 	gtk_widget_set_margin_start(GTK_WIDGET(widget), 18);
-	gtk_grid_attach(GTK_GRID(grid), widget, 0, 14, 1, 1);
+	gtk_grid_attach(GTK_GRID(grid), widget, 0, 15, 1, 1);
 	widget = gtk_label_new(_("Reconnect attempts number"));
 	gtk_widget_show(widget);
 	gtk_widget_set_halign(GTK_WIDGET(widget), GTK_ALIGN_START);
 	gtk_widget_set_valign(GTK_WIDGET(widget), GTK_ALIGN_CENTER);
 	gtk_widget_set_margin_start(GTK_WIDGET(widget), 6);
-	gtk_grid_attach(GTK_GRID(grid), widget, 1, 14, 1, 1);
+	gtk_grid_attach(GTK_GRID(grid), widget, 1, 15, 1, 1);
 	widget = gtk_entry_new();
 	gtk_widget_show(widget);
 	gtk_widget_set_halign(GTK_WIDGET(widget), GTK_ALIGN_END);
 	gtk_widget_set_valign(GTK_WIDGET(widget), GTK_ALIGN_CENTER);
-	gtk_grid_attach(GTK_GRID(grid), widget, 2, 14, 1, 1);
+	gtk_grid_attach(GTK_GRID(grid), widget, 2, 15, 1, 1);
 	gtk_entry_set_input_purpose(GTK_ENTRY(widget), GTK_INPUT_PURPOSE_NUMBER);
 	gtk_entry_set_input_hints(GTK_ENTRY(widget), GTK_INPUT_HINT_NONE);
 	gtk_widget_set_tooltip_text(widget, _("The maximum number of reconnect attempts upon an RDP disconnect (default: 20)"));
@@ -767,18 +784,18 @@ static void remmina_rdp_settings_grid_init(RemminaPluginRdpsetGrid *grid)
 	gtk_widget_set_valign(GTK_WIDGET(widget), GTK_ALIGN_CENTER);
 	gtk_widget_set_margin_end(GTK_WIDGET(widget), 6);
 	gtk_widget_set_margin_start(GTK_WIDGET(widget), 18);
-	gtk_grid_attach(GTK_GRID(grid), widget, 0, 15, 1, 1);
+	gtk_grid_attach(GTK_GRID(grid), widget, 0, 16, 1, 1);
 	widget = gtk_label_new(_("FreeRDP auth-pkg-list"));
 	gtk_widget_show(widget);
 	gtk_widget_set_halign(GTK_WIDGET(widget), GTK_ALIGN_START);
 	gtk_widget_set_valign(GTK_WIDGET(widget), GTK_ALIGN_CENTER);
 	gtk_widget_set_margin_start(GTK_WIDGET(widget), 6);
-	gtk_grid_attach(GTK_GRID(grid), widget, 1, 15, 1, 1);
+	gtk_grid_attach(GTK_GRID(grid), widget, 1, 16, 1, 1);
 	widget = gtk_entry_new();
 	gtk_widget_show(widget);
 	gtk_widget_set_halign(GTK_WIDGET(widget), GTK_ALIGN_END);
 	gtk_widget_set_valign(GTK_WIDGET(widget), GTK_ALIGN_CENTER);
-	gtk_grid_attach(GTK_GRID(grid), widget, 2, 15, 1, 1);
+	gtk_grid_attach(GTK_GRID(grid), widget, 2, 16, 1, 1);
 	gtk_entry_set_input_purpose(GTK_ENTRY(widget), GTK_INPUT_PURPOSE_NUMBER);
 	gtk_entry_set_input_hints(GTK_ENTRY(widget), GTK_INPUT_HINT_NONE);
 	gtk_widget_set_tooltip_text(widget, _("Authentication package filter(comma-separated list, use '!' to exclude)"));

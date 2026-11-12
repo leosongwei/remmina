@@ -50,6 +50,7 @@
 #include "remmina_public.h"
 #include "remmina_ssh.h"
 #include "remmina_log.h"
+#include "rcw_platform.h"
 #include "remmina/remmina_trace_calls.h"
 
 #ifdef GDK_WINDOWING_WAYLAND
@@ -1482,6 +1483,28 @@ void remmina_protocol_widget_set_height(RemminaProtocolWidget *gp, gint height)
 {
 	TRACE_CALL(__func__);
 	gp->priv->height = height;
+}
+
+gdouble remmina_protocol_widget_get_display_scale(RemminaProtocolWidget *gp)
+{
+	TRACE_CALL(__func__);
+	GtkWidget *widget = GTK_WIDGET(gp);
+	GtkWidget *toplevel = gtk_widget_get_toplevel(widget);
+	GdkDisplay *display = gtk_widget_get_display(widget);
+	GdkMonitor *monitor = NULL;
+	gdouble scale = 0;
+
+	if (toplevel && gtk_widget_get_window(toplevel))
+		monitor = gdk_display_get_monitor_at_window(display, gtk_widget_get_window(toplevel));
+	if (!monitor)
+		monitor = gdk_display_get_monitor(display, 0);
+	if (monitor)
+		scale = rcw_monitor_display_scale(monitor);
+
+	if (scale < 1.0)
+		scale = gtk_widget_get_scale_factor(widget);
+
+	return scale;
 }
 
 RemminaScaleMode remmina_protocol_widget_get_current_scale_mode(RemminaProtocolWidget *gp)

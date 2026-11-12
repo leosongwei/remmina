@@ -87,6 +87,9 @@ gint remmina_protocol_widget_get_width(RemminaProtocolWidget *gp);
 void remmina_protocol_widget_set_width(RemminaProtocolWidget *gp, gint width);
 gint remmina_protocol_widget_get_height(RemminaProtocolWidget *gp);
 void remmina_protocol_widget_set_height(RemminaProtocolWidget *gp, gint height);
+/* Scale factor the display server applies to the connection window, including
+ * fractional Wayland compositor scales */
+gdouble remmina_protocol_widget_get_display_scale(RemminaProtocolWidget *gp);
 gint remmina_protocol_widget_get_profile_remote_width(RemminaProtocolWidget *gp);
 gint remmina_protocol_widget_get_profile_remote_height(RemminaProtocolWidget *gp);
 gint remmina_protocol_widget_get_multimon(RemminaProtocolWidget *gp);

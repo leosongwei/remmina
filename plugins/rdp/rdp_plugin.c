@@ -1870,6 +1870,12 @@ static gboolean remmina_rdp_main(RemminaProtocolWidget *gp)
 
 	gint w = remmina_plugin_service->get_profile_remote_width(gp);
 	gint h = remmina_plugin_service->get_profile_remote_height(gp);
+	/* Render at the physical pixel size of the window when local display
+	 * scaling compensation is requested */
+	if (rfi->initial_width > 0 && rfi->initial_height > 0) {
+		w = rfi->initial_width;
+		h = rfi->initial_height;
+	}
 	/* multiple of 4 */
 	w = (w + 3) & ~0x3;
 	h = (h + 3) & ~0x3;
@@ -2947,6 +2953,38 @@ static gboolean remmina_rdp_open_connection(RemminaProtocolWidget *gp)
 	rfi->scale = remmina_plugin_service->remmina_protocol_widget_get_current_scale_mode(gp);
 
 	remminafile = remmina_plugin_service->protocol_plugin_get_file(gp);
+
+	/* Cache the scale factor the local display server applies to the window.
+	 * When the user asks for native pixels the remote desktop is rendered at
+	 * window size * local_scale and scaled back down on the client, so that
+	 * a fractional compositor scale (e.g. 1.4 on KDE Wayland) does not
+	 * magnify the remote picture. Multi monitor sessions are left alone. */
+	rfi->local_scale = 1.0;
+	rfi->initial_width = 0;
+	rfi->initial_height = 0;
+	gint resolution_mode = remmina_plugin_service->file_get_int(remminafile, "resolution_mode",
+								   RES_USE_INITIAL_WINDOW_SIZE);
+	gchar *ignore_local_scale = remmina_plugin_service->pref_get_value("rdp_ignore_local_scale");
+	if (ignore_local_scale && atoi(ignore_local_scale) != 0 &&
+	    resolution_mode != RES_USE_CUSTOM &&
+	    !remmina_plugin_service->file_get_int(remminafile, "multimon", FALSE)) {
+		gdouble scale = remmina_plugin_service->protocol_widget_get_display_scale(gp);
+		if (scale > 1.0 && scale <= 8.0)
+			rfi->local_scale = scale;
+	}
+	g_free(ignore_local_scale);
+
+	if (rfi->local_scale > 1.0) {
+		/* The remote resolution follows the client area, so use its size in
+		 * physical pixels (gtk_widget_get_allocation() is in logical units) */
+		GtkAllocation allocation;
+
+		gtk_widget_get_allocation(GTK_WIDGET(gp), &allocation);
+		if (allocation.width > 10 && allocation.height > 10) {
+			rfi->initial_width = (gint)(allocation.width * rfi->local_scale);
+			rfi->initial_height = (gint)(allocation.height * rfi->local_scale);
+		}
+	}
 
 
 	if (pthread_create(&rfi->remmina_plugin_thread, NULL, remmina_rdp_main_thread, gp)) {

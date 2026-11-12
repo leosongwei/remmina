@@ -326,6 +326,7 @@ typedef struct _RemminaPluginService {
 	GtkWindow *(*get_window)(void);
 	gint (*plugin_unlock_new)(GtkWindow* parent);
 	void (*add_network_state)(gchar* key, gchar* value);
+	gdouble (*protocol_widget_get_display_scale)(RemminaProtocolWidget *gp);
 } RemminaPluginService;
 
 /* "Prototype" of the plugin entry function */

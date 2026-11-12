@@ -38,3 +38,8 @@
 
 #include <gdk/gdk.h>
 const GdkRectangle rcw_first_monitor_geometry();
+
+/* Scale factor the display server actually applies to windows, which may be
+ * fractional (e.g. 1.4 on KDE) while GTK 3 only reports an integer one.
+ * Returns 0 when it cannot be determined. */
+gdouble rcw_monitor_display_scale(GdkMonitor *monitor);
