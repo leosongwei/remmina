@@ -234,6 +234,38 @@ static void keypress_list_add(RemminaProtocolWidget *gp, RemminaPluginRdpEvent r
 }
 
 
+/* Dynamic resolution update scale factor, in percent, read from the
+ * Remmina preferences at connection time and cached in rfi (the preferences
+ * file must not be read on every mouse event). With a factor of N%, when the
+ * client window is W x H, the remote desktop is rendered at W * 100 / N x
+ * H * 100 / N pixels and the picture received from the server is scaled by
+ * N / 100 on the client.
+ * Falls back to 100% until the cache is filled, and on out of range values */
+static gint remmina_rdp_event_dynres_scale_pct(rfContext *rfi)
+{
+	TRACE_CALL(__func__);
+	return (rfi->dynres_scale_pct >= 10 && rfi->dynres_scale_pct <= 400) ?
+	       rfi->dynres_scale_pct : 100;
+}
+
+/* TRUE when we are in DYNRES mode with a scale factor which requires the
+ * picture received from the server to be scaled before being drawn */
+static gboolean remmina_rdp_event_dynres_is_scaled(rfContext *rfi)
+{
+	TRACE_CALL(__func__);
+	return rfi->scale == REMMINA_PROTOCOL_WIDGET_SCALE_MODE_DYNRES &&
+	       remmina_rdp_event_dynres_scale_pct(rfi) != 100;
+}
+
+/* TRUE when the drawing must be scaled to the drawing area size, either in
+ * classic SCALED mode, or in DYNRES mode with a non 100% scale factor */
+static gboolean remmina_rdp_event_is_scaled_like(rfContext *rfi)
+{
+	TRACE_CALL(__func__);
+	return rfi->scale == REMMINA_PROTOCOL_WIDGET_SCALE_MODE_SCALED ||
+	       remmina_rdp_event_dynres_is_scaled(rfi);
+}
+
 static void remmina_rdp_event_scale_area(RemminaProtocolWidget *gp, gint *x, gint *y, gint *w, gint *h)
 {
 	TRACE_CALL(__func__);
@@ -304,7 +336,7 @@ void remmina_rdp_event_update_regions(RemminaProtocolWidget *gp, RemminaPluginRd
 		w = ui->reg.ureg[i].w;
 		h = ui->reg.ureg[i].h;
 
-		if (rfi->scale == REMMINA_PROTOCOL_WIDGET_SCALE_MODE_SCALED)
+		if (remmina_rdp_event_is_scaled_like(rfi))
 			remmina_rdp_event_scale_area(gp, &x, &y, &w, &h);
 		else
 			remmina_rdp_event_pad_redraw_area(gp, &x, &y, &w, &h);
@@ -345,7 +377,7 @@ static void remmina_rdp_event_update_scale_factor(RemminaProtocolWidget *gp)
 	gpwidth = a.width;
 	gpheight = a.height;
 
-	if (rfi->scale == REMMINA_PROTOCOL_WIDGET_SCALE_MODE_SCALED) {
+	if (remmina_rdp_event_is_scaled_like(rfi)) {
 		if ((gpwidth > 1) && (gpheight > 1)) {
 			rdwidth = remmina_plugin_service->protocol_plugin_get_width(gp);
 			rdheight = remmina_plugin_service->protocol_plugin_get_height(gp);
@@ -380,7 +412,7 @@ static gboolean remmina_rdp_event_on_draw_other_monitors(GtkWidget *widget, cair
 	if (!rfi->surface)
 		return FALSE;
 
-	if (rfi->scale == REMMINA_PROTOCOL_WIDGET_SCALE_MODE_SCALED)
+	if (remmina_rdp_event_is_scaled_like(rfi))
 		cairo_scale(context, rfi->scale_x, rfi->scale_y);
 
 	gint n_monitors = remmina_plugin_service->plugin_multimon_monitor_count(gp);
@@ -444,7 +476,7 @@ static gboolean remmina_rdp_event_on_draw(GtkWidget *widget, cairo_t *context, R
 		if (!rfi->surface)
 			return FALSE;
 
-		if (rfi->scale == REMMINA_PROTOCOL_WIDGET_SCALE_MODE_SCALED)
+		if (remmina_rdp_event_is_scaled_like(rfi))
 			cairo_scale(context, rfi->scale_x, rfi->scale_y);
 
 		cairo_surface_flush(rfi->surface);
@@ -498,14 +530,23 @@ static gboolean remmina_rdp_event_delayed_monitor_layout(RemminaProtocolWidget *
 		prevheight = remmina_plugin_service->protocol_plugin_get_height(gp);
 		gint num_monitors = freerdp_settings_get_uint32(rfi->clientContext.context.settings, FreeRDP_MonitorCount);
 
-		if ((gpwidth != prevwidth || gpheight != prevheight || num_monitors != rfi->prev_num_monitors) && gpwidth >= 200 && gpheight >= 200) {
+		/* In single monitor mode, ask the server to render the remote desktop at
+		 * the window size scaled by the dynamic resolution update scale factor */
+		gint reqwidth = gpwidth, reqheight = gpheight;
+		if (!remmina_plugin_service->file_get_int(remminafile, "multimon", FALSE)) {
+			gint pct = remmina_rdp_event_dynres_scale_pct(rfi);
+			reqwidth = gpwidth * 100 / pct;
+			reqheight = gpheight * 100 / pct;
+		}
+
+		if ((reqwidth != prevwidth || reqheight != prevheight || num_monitors != rfi->prev_num_monitors) && reqwidth >= 200 && reqheight >= 200) {
 			rfi->prev_num_monitors = num_monitors;
-			if (rfi->rdpgfxchan) {
+			if (rfi->rdpgfxchan && !remmina_plugin_service->file_get_int(remminafile, "multimon", FALSE)) {
 				/* Workaround for FreeRDP issue #5417 */
-				if (gpwidth < AVC_MIN_DESKTOP_WIDTH)
-					gpwidth = AVC_MIN_DESKTOP_WIDTH;
-				if (gpheight < AVC_MIN_DESKTOP_HEIGHT)
-					gpheight = AVC_MIN_DESKTOP_HEIGHT;
+				if (reqwidth < AVC_MIN_DESKTOP_WIDTH)
+					reqwidth = AVC_MIN_DESKTOP_WIDTH;
+				if (reqheight < AVC_MIN_DESKTOP_HEIGHT)
+					reqheight = AVC_MIN_DESKTOP_HEIGHT;
 			}
 			rdp_event.type = REMMINA_RDP_EVENT_TYPE_SEND_MONITOR_LAYOUT;
 			if (remmina_plugin_service->file_get_int(remminafile, "multimon", FALSE)) {
@@ -538,8 +579,8 @@ static gboolean remmina_rdp_event_delayed_monitor_layout(RemminaProtocolWidget *
 				}
 				remmina_rdp_event_event_push(gp, &rdp_event);
 			} else {
-				rdp_event.monitor_layout.width = gpwidth;
-				rdp_event.monitor_layout.height = gpheight;
+				rdp_event.monitor_layout.width = reqwidth;
+				rdp_event.monitor_layout.height = reqheight;
 				rdp_event.monitor_layout.desktopOrientation = desktopOrientation;
 				rdp_event.monitor_layout.desktopScaleFactor = desktopScaleFactor;
 				rdp_event.monitor_layout.deviceScaleFactor = deviceScaleFactor;
@@ -609,7 +650,7 @@ static void remmina_rdp_event_translate_pos(RemminaProtocolWidget *gp, GtkWidget
 	}
 	rfi->motion_drawing_area = w;
 
-	if ((rfi->scale == REMMINA_PROTOCOL_WIDGET_SCALE_MODE_SCALED) && (rfi->scale_width >= 1) && (rfi->scale_height >= 1)) {
+	if (remmina_rdp_event_is_scaled_like(rfi) && (rfi->scale_width >= 1) && (rfi->scale_height >= 1)) {
 		*ox = (UINT16)(ix * remmina_plugin_service->protocol_plugin_get_width(gp) / rfi->scale_width) + delta_x - rfi->orig_shift_x;
 		*oy = (UINT16)(iy * remmina_plugin_service->protocol_plugin_get_height(gp) / rfi->scale_height) + delta_y - rfi->orig_shift_y;
 	} else {
@@ -631,7 +672,7 @@ static void remmina_rdp_event_reverse_translate_pos_reverse(RemminaProtocolWidge
 	if (!rfi || !rfi->connected || rfi->is_reconnecting)
 		return;
 
-	if ((rfi->scale == REMMINA_PROTOCOL_WIDGET_SCALE_MODE_SCALED) && (rfi->scale_width >= 1) && (rfi->scale_height >= 1)) {
+	if (remmina_rdp_event_is_scaled_like(rfi) && (rfi->scale_width >= 1) && (rfi->scale_height >= 1)) {
 		*ox = (ix * rfi->scale_width) / remmina_plugin_service->protocol_plugin_get_width(gp);
 		*oy = (iy * rfi->scale_height) / remmina_plugin_service->protocol_plugin_get_height(gp);
 	} else {
@@ -1388,14 +1429,20 @@ static void remmina_rdp_event_connected(RemminaProtocolWidget *gp, RemminaPlugin
 {
 	TRACE_CALL(__func__);
 	rfContext *rfi = GET_PLUGIN_DATA(gp);
-	rdpGdi *gdi;
+	gchar *s;
 
-	gdi = ((rdpContext *)rfi)->gdi;
+	/* Cache the dynamic resolution update scale factor for this connection */
+	s = remmina_plugin_service->pref_get_value("rdp_dynres_scale");
+	rfi->dynres_scale_pct = (s && s[0] ? CLAMP(atoi(s), 10, 400) : 100);
+	g_free(s);
 
 	gtk_widget_realize(rfi->drawing_area);
 
 	remmina_rdp_event_create_cairo_surface(rfi);
-	gtk_widget_queue_draw_area(rfi->drawing_area, 0, 0, gdi->width, gdi->height);
+	/* Full redraw: the drawing area may be bigger than the remote surface
+	 * when the picture must be scaled (SCALED mode or DYNRES with a
+	 * dynamic resolution update scale factor) */
+	gtk_widget_queue_draw(rfi->drawing_area);
 
 	remmina_rdp_event_update_scale(gp);
 

@@ -340,6 +340,9 @@ struct rf_context {
 	gint			scale_height;
 	gdouble			scale_x;
 	gdouble			scale_y;
+	/* Dynamic resolution update scale factor, %, cached from the
+	 * Remmina preferences when the connection is established */
+	gint			dynres_scale_pct;
 	guint			delayed_monitor_layout_handler;
 	gboolean		use_client_keymap;
 

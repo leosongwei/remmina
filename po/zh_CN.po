@@ -5281,6 +5281,25 @@ msgstr "网关域\\用户名"
 msgid "<span weight='bold' size='larger'>Multi Password Changer</span>"
 msgstr "<span weight='bold' size='larger'>多密码转换器</span>"
 
+#: plugins/rdp/rdp_settings.c
+msgid "Dynamic resolution update scale %"
+msgstr "动态分辨率更新缩放 %"
+
+#: plugins/rdp/rdp_settings.c
+msgid ""
+"Percentage applied to the remote desktop resolution when the dynamic "
+"resolution update feature is active; the picture is then scaled to the "
+"client window size. Higher values make the remote host render at a lower "
+"resolution and reduce its load (e.g. at 200% a 4K client window is rendered "
+"at 1080p); values below 100% make the host render at a higher resolution "
+"than the client window for a sharper picture. Takes effect on new "
+"connections."
+msgstr ""
+"开启动态分辨率更新时应用到远程桌面分辨率的百分比，画面随后由客户机缩放到窗口"
+"大小。调高此值可让远程主机以更低分辨率渲染、减轻其负载（如 200% 时 4K 客户机"
+"窗口以 1080p 渲染）；低于 100% 时主机以高于窗口的分辨率渲染以获得更清晰的画"
+"面。修改后对新连接生效。"
+
 #~ msgid "Enter TOTP/OTP/2FA code"
 #~ msgstr "输入 TOTP/OTP/2FA 代码"
 
